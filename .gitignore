@@ -1,0 +1,4 @@
+submodules/
+**/__pycache__/
+**/temp/
+**/temp_*/
