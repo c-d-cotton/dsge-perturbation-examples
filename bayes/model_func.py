@@ -1,55 +1,9 @@
 #!/usr/bin/env python3
-# PYTHON_PREAMBLE_START_STANDARD:{{{
-
-# Christopher David Cotton (c)
-# http://www.cdcotton.com
-
-# modules needed for preamble
-import importlib
 import os
 from pathlib import Path
 import sys
 
-# Get full real filename
-__fullrealfile__ = os.path.abspath(__file__)
-
-# Function to get git directory containing this file
-def getprojectdir(filename):
-    curlevel = filename
-    while curlevel is not '/':
-        curlevel = os.path.dirname(curlevel)
-        if os.path.exists(curlevel + '/.git/'):
-            return(curlevel + '/')
-    return(None)
-
-# Directory of project
-__projectdir__ = Path(getprojectdir(__fullrealfile__))
-
-# Function to call functions from files by their absolute path.
-# Imports modules if they've not already been imported
-# First argument is filename, second is function name, third is dictionary containing loaded modules.
-modulesdict = {}
-def importattr(modulefilename, func, modulesdict = modulesdict):
-    # get modulefilename as string to prevent problems in <= python3.5 with pathlib -> os
-    modulefilename = str(modulefilename)
-    # if function in this file
-    if modulefilename == __fullrealfile__:
-        return(eval(func))
-    else:
-        # add file to moduledict if not there already
-        if modulefilename not in modulesdict:
-            # check filename exists
-            if not os.path.isfile(modulefilename):
-                raise Exception('Module not exists: ' + modulefilename + '. Function: ' + func + '. Filename called from: ' + __fullrealfile__ + '.')
-            # add directory to path
-            sys.path.append(os.path.dirname(modulefilename))
-            # actually add module to moduledict
-            modulesdict[modulefilename] = importlib.import_module(''.join(os.path.basename(modulefilename).split('.')[: -1]))
-
-        # get the actual function from the file and return it
-        return(getattr(modulesdict[modulefilename], func))
-
-# PYTHON_PREAMBLE_END:}}}
+__projectdir__ = Path(os.path.dirname(os.path.realpath(__file__)) + '/../')
 
 
 # Definitions:{{{1
@@ -95,7 +49,9 @@ def getbasicmodel(paramssdict):
 
     r['controls'] = ['c', 'y']
     r['states'] = ['a', 'k']
-    r['stateposdict'], r['controlposdict'], r['allposdict'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'getposdicts')(r['states'], r['controls'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import getposdicts
+    r['stateposdict'], r['controlposdict'], r['allposdict'] = getposdicts(r['states'], r['controls'])
 
     # matrices for later
     r['Et_eqs_string'] = [
@@ -108,19 +64,27 @@ def getbasicmodel(paramssdict):
     'y - a * k**ALPHA'
     ]
 
-    r['Et_eqs'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'convertstringlisttosympy')(r['Et_eqs_string'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import convertstringlisttosympy
+    r['Et_eqs'] = convertstringlisttosympy(r['Et_eqs_string'])
 
     # check variables specified correctly
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'checkeqs')(r['Et_eqs'], r['controls'] + r['states'], params = list(paramssdict))
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import checkeqs
+    checkeqs(r['Et_eqs'], r['controls'] + r['states'], params = list(paramssdict))
 
     # get varssdict in terms of parameters
     r['varssdict'] = addparamendogdict(paramssdict)
 
     # convert vars and varssdict
     # convert all states and controls into logs (unusual not to have levels vars)
-    r['Et_eqs'], r['varssdict'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'convertlogvariables')(r['Et_eqs'], samenamelist = r['states'] + r['controls'], varssdict = r['varssdict'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import convertlogvariables
+    r['Et_eqs'], r['varssdict'] = convertlogvariables(r['Et_eqs'], samenamelist = r['states'] + r['controls'], varssdict = r['varssdict'])
 
-    r['fx'], r['fxp'], r['fy'], r['fyp'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'dsgeanalysisdiff')(r['Et_eqs'], r['states'], r['controls'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import dsgeanalysisdiff
+    r['fx'], r['fxp'], r['fy'], r['fyp'] = dsgeanalysisdiff(r['Et_eqs'], r['states'], r['controls'])
 
     return(r)
 
@@ -162,11 +126,17 @@ def allparams_solve(paramssdict):
     r = getbasicmodel(paramssdict)
 
     # get replacedict
-    r['replacedict'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'getfullreplacedict')([r['varssdict']], variables = r['states'] + r['controls'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import getfullreplacedict
+    r['replacedict'] = getfullreplacedict([r['varssdict']], variables = r['states'] + r['controls'])
 
-    r['nfx'], r['nfxp'], r['nfy'], r['nfyp'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'numeval_full')(r['fx'], r['fxp'], r['fy'], r['fyp'], r['replacedict'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import numeval_full
+    r['nfx'], r['nfxp'], r['nfy'], r['nfyp'] = numeval_full(r['fx'], r['fxp'], r['fy'], r['fyp'], r['replacedict'])
 
-    r['C'], r['A'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsge_bkdiscrete_func.py'), 'gxhx')(r['nfx'], r['nfxp'], r['nfy'], r['nfyp'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsge_bkdiscrete_func import gxhx
+    r['C'], r['A'] = gxhx(r['nfx'], r['nfxp'], r['nfy'], r['nfyp'])
 
     return(r)
 
@@ -204,7 +174,9 @@ def getsimdata():
     r = allparams_solve(paramssdict)
     r = addABCD(r)
 
-    X, Y, v = importattr(__projectdir__ / Path('submodules/python-math-func/statespace/statespace_func.py'), 'statespace_simdata')(r['A'], r['B2'], r['C2'], r['D2'], 1000)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/statespace')))
+    from statespace_func import statespace_simdata
+    X, Y, v = statespace_simdata(r['A'], r['B2'], r['C2'], r['D2'], 1000)
 
     return(Y)
     
@@ -232,13 +204,19 @@ def getnumderivs_unknownparams(paramssdict, estimatevars):
             del r['varssdict2'][var]
 
     # get replacedict
-    r['replacedict'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'getfullreplacedict')([r['varssdict2']], variables = r['states'] + r['controls'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import getfullreplacedict
+    r['replacedict'] = getfullreplacedict([r['varssdict2']], variables = r['states'] + r['controls'])
 
     # replace non-estimatevars
-    fx, fxp, fy, fyp = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'numeval_partial')(r['fx'], r['fxp'], r['fy'], r['fyp'], r['replacedict'])
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import numeval_partial
+    fx, fxp, fy, fyp = numeval_partial(r['fx'], r['fxp'], r['fy'], r['fyp'], r['replacedict'])
 
     # convert to function
-    r['fx_f'], r['fxp_f'], r['fy_f'], r['fyp_f'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'numeval_convertfunc')(fx, fxp, fy, fyp, estimatevars)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import numeval_convertfunc
+    r['fx_f'], r['fxp_f'], r['fy_f'], r['fyp_f'] = numeval_convertfunc(fx, fxp, fy, fyp, estimatevars)
 
     return(r)
 
@@ -252,7 +230,9 @@ def getloglfunc(estimatevars, y):
 
     def loglfunc(params, r = r):
         
-        r['C'], r['A'] = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsge_bkdiscrete_func.py'), 'gxhx')(r['fx_f'](*params), r['fxp_f'](*params), r['fy_f'](*params), r['fyp_f'](*params))
+        sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+        from dsge_bkdiscrete_func import gxhx
+        r['C'], r['A'] = gxhx(r['fx_f'](*params), r['fxp_f'](*params), r['fy_f'](*params), r['fyp_f'](*params))
 
         # add to varssdict for addABCD function
         for i in range(0, len(estimatevars)):
@@ -261,10 +241,14 @@ def getloglfunc(estimatevars, y):
         r = addABCD(r)
 
         # get kalman filter
-        x_t_tm1, P_t_tm1, x_t_t, P_t_t, y_t_tm1, Q_t_tm1, R_t_tm1 = importattr(__projectdir__ / Path('submodules/python-math-func/statespace/statespace_func.py'), 'kalmanfilter')(y, r['A'], r['B2'], r['C2'], r['D2'])
+        sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/statespace')))
+        from statespace_func import kalmanfilter
+        x_t_tm1, P_t_tm1, x_t_t, P_t_t, y_t_tm1, Q_t_tm1, R_t_tm1 = kalmanfilter(y, r['A'], r['B2'], r['C2'], r['D2'])
 
         # get log likelihood
-        ll = importattr(__projectdir__ / Path('submodules/python-math-func/statespace/statespace_func.py'), 'logl_prop_kalmanfilter')(y, y_t_tm1, Q_t_tm1)
+        sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/statespace')))
+        from statespace_func import logl_prop_kalmanfilter
+        ll = logl_prop_kalmanfilter(y, y_t_tm1, Q_t_tm1)
 
         return(ll)
 
@@ -286,7 +270,9 @@ def getmax(printdetails = False):
     lowerboundlist = [lowerbounddict[var] for var in estimatevars]
     upperboundlist = [upperbounddict[var] for var in estimatevars]
 
-    importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'boundedrandommle')(logl_func, lowerboundlist, upperboundlist, outputfolder = 'temp/max/', printdetails = printdetails, continuefile = True)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import boundedrandommle
+    boundedrandommle(logl_func, lowerboundlist, upperboundlist, outputfolder = 'temp/max/', printdetails = printdetails, continuefile = True)
 
 
 # Bayesian Analysis:{{{1
@@ -304,9 +290,13 @@ def getdists(printdetails = False, numiterations = 1e5, savefile = None, realdat
     startvaldict = {}
     lowerbounddict, upperbounddict = getbounddicts(estimatevars)
 
-    lowerboundlist, upperboundlist, scalelist, startvallist = importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'metropolis_bounds_getdicts')(estimatevars, lowerbounddict, upperbounddict, scaledict, startvaldict)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import metropolis_bounds_getdicts
+    lowerboundlist, upperboundlist, scalelist, startvallist = metropolis_bounds_getdicts(estimatevars, lowerbounddict, upperbounddict, scaledict, startvaldict)
 
-    importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'metropolis_bounds_do')(logl_func, lowerboundlist, upperboundlist, scalelist, startvallist, numiterations = numiterations, printdetails = printdetails, logposterior = True, savefile = savefile)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import metropolis_bounds_do
+    metropolis_bounds_do(logl_func, lowerboundlist, upperboundlist, scalelist, startvallist, numiterations = numiterations, printdetails = printdetails, logposterior = True, savefile = savefile)
 
 
 def getdists_poolf_real(savefile):
@@ -328,7 +318,9 @@ def getdists_multiprocessing(numprocesses = None, deleteoldresults = True, reald
         poolf = getdists_poolf_sim
         savefolder = __projectdir__ / Path('me/bayes/temp/dist_sim/')
 
-    importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'getdists_pool')(poolf, savefolder, numprocesses = numprocesses, deleteoldresults = deleteoldresults)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import getdists_pool
+    getdists_pool(poolf, savefolder, numprocesses = numprocesses, deleteoldresults = deleteoldresults)
 
 
 # Analysis Post Parameter Estimation:{{{1
@@ -344,7 +336,9 @@ def analysebayes(realdata = True):
     else:
         savefolder = __projectdir__ / Path('me/bayes/temp/dist_sim/')
 
-    data = importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'getdistfromfolder')(savefolder)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import getdistfromfolder
+    data = getdistfromfolder(savefolder)
     means = np.mean(data, axis = 0)
 
     print('Mean values:')
@@ -358,7 +352,9 @@ def analysebayes(realdata = True):
     r = allparams_solve(paramssdict)
     r = addABCD(r)
 
-    bigA, bigB = importattr(__projectdir__ / Path('submodules/python-math-func/statespace/statespace_func.py'), 'ABCD_convert')(r['A'], r['B'], r['C'], r['D'])
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/statespace')))
+    from statespace_func import ABCD_convert
+    bigA, bigB = ABCD_convert(r['A'], r['B'], r['C'], r['D'])
     # print(bigA)
     # print(bigB)
 

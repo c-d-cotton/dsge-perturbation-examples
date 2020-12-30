@@ -5,57 +5,11 @@ I embed the standard deviation of the shocks into the equations do I don't need 
 Basic RBC model.
 The econometrician observes ygrowth and cgrowth with some error. If we don't have observation error then we can only use one of ygrowth and cgrowth since they become non-independent.
 """
-# PYTHON_PREAMBLE_START_STANDARD:{{{
-
-# Christopher David Cotton (c)
-# http://www.cdcotton.com
-
-# modules needed for preamble
-import importlib
 import os
 from pathlib import Path
 import sys
 
-# Get full real filename
-__fullrealfile__ = os.path.abspath(__file__)
-
-# Function to get git directory containing this file
-def getprojectdir(filename):
-    curlevel = filename
-    while curlevel is not '/':
-        curlevel = os.path.dirname(curlevel)
-        if os.path.exists(curlevel + '/.git/'):
-            return(curlevel + '/')
-    return(None)
-
-# Directory of project
-__projectdir__ = Path(getprojectdir(__fullrealfile__))
-
-# Function to call functions from files by their absolute path.
-# Imports modules if they've not already been imported
-# First argument is filename, second is function name, third is dictionary containing loaded modules.
-modulesdict = {}
-def importattr(modulefilename, func, modulesdict = modulesdict):
-    # get modulefilename as string to prevent problems in <= python3.5 with pathlib -> os
-    modulefilename = str(modulefilename)
-    # if function in this file
-    if modulefilename == __fullrealfile__:
-        return(eval(func))
-    else:
-        # add file to moduledict if not there already
-        if modulefilename not in modulesdict:
-            # check filename exists
-            if not os.path.isfile(modulefilename):
-                raise Exception('Module not exists: ' + modulefilename + '. Function: ' + func + '. Filename called from: ' + __fullrealfile__ + '.')
-            # add directory to path
-            sys.path.append(os.path.dirname(modulefilename))
-            # actually add module to moduledict
-            modulesdict[modulefilename] = importlib.import_module(''.join(os.path.basename(modulefilename).split('.')[: -1]))
-
-        # get the actual function from the file and return it
-        return(getattr(modulesdict[modulefilename], func))
-
-# PYTHON_PREAMBLE_END:}}}
+__projectdir__ = Path(os.path.dirname(os.path.realpath(__file__)) + '/../')
 
 import functools
 import numpy as np
@@ -170,13 +124,17 @@ def checks():
     p = getparamssdict()
     inputdict_loglin = getinputdict_full(p, loglineareqs = True)
     inputdict_log = getinputdict_full(p, loglineareqs = False)
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'checksame_inputdict')(inputdict_loglin, inputdict_log)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import checksame_inputdict
+    checksame_inputdict(inputdict_loglin, inputdict_log)
     
 
 def solvefulldsge(p):
     inputdict = getinputdict_full(p)
 
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsge_bkdiscrete_func.py'), 'discretelineardsgefull')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsge_bkdiscrete_func import discretelineardsgefull
+    inputdict = discretelineardsgefull(inputdict)
 
 
 def solvefulldsge_test():
@@ -196,15 +154,21 @@ def getinputdict_bayesian():
     # get model
     # we haven't solved for the steady state so allow for missingparams
     inputdict['missingparams'] = True
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgesetup_func.py'), 'getmodel_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgesetup_func import getmodel_inputdict
+    getmodel_inputdict(inputdict)
 
     # compute analytical fx, fxp, fy, fyp matrices
     # don't cancel params so do full replace of variables
     inputdict['fxefy_cancelparams'] = False
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'getfxefy_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import getfxefy_inputdict
+    inputdict = getfxefy_inputdict(inputdict)
 
     # convert fx, fxy, fy, fyp matrices to functions (makes it quicker to do conversion)
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgediff_func.py'), 'funcstoeval_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgediff_func import funcstoeval_inputdict
+    inputdict = funcstoeval_inputdict(inputdict)
 
     return(inputdict)
 
@@ -231,11 +195,15 @@ def getrealdata():
 
     # getting y
 
-    dftemp = importattr(__projectdir__ / Path('submodules/python-data-func/fred_func.py'), 'loadfred')(__projectdir__ / Path('bayes/data/fred/GDPC1.csv'), 'Q', varname = 'real_gdp_billions')
+    sys.path.append(str(__projectdir__ / Path('submodules/python-data-func/')))
+    from fred_func import loadfred
+    dftemp = loadfred(__projectdir__ / Path('bayes/data/fred/GDPC1.csv'), 'Q', varname = 'real_gdp_billions')
     # rearrange columns
     dfq = dftemp[['time', 'real_gdp_billions']]
 
-    dftemp = importattr(__projectdir__ / Path('submodules/python-data-func/fred_func.py'), 'loadfred')(__projectdir__ / Path('bayes/data/fred/PCECC96.csv'), 'Q', varname = 'real_cons_billions')
+    sys.path.append(str(__projectdir__ / Path('submodules/python-data-func/')))
+    from fred_func import loadfred
+    dftemp = loadfred(__projectdir__ / Path('bayes/data/fred/PCECC96.csv'), 'Q', varname = 'real_cons_billions')
     dfq = dfq.merge(dftemp, on = ['time'], how = 'outer')
 
     def detrendquarterlyvar(series):
@@ -278,17 +246,25 @@ def getsimdata(varnames, numperiods = 100):
     inputdict = getinputdict_full()
 
     # complete inputdict
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgesetup_func.py'), 'getmodel_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgesetup_func import getmodel_inputdict
+    inputdict = getmodel_inputdict(inputdict)
 
     # get policy function
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsge_bkdiscrete_func.py'), 'polfunc_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsge_bkdiscrete_func import polfunc_inputdict
+    inputdict = polfunc_inputdict(inputdict)
 
     # add shocks
     inputdict['pathsimperiods'] = numperiods
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/getshocks_func.py'), 'getshockpath_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from getshocks_func import getshockpath_inputdict
+    inputdict = getshockpath_inputdict(inputdict)
 
     # simulate path
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/simlineardsge_func.py'), 'simpathlinear_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from simlineardsge_func import simpathlinear_inputdict
+    inputdict = simpathlinear_inputdict(inputdict)
 
     data = inputdict['varpath'][:, [inputdict['stateshockcontrolposdict'][varnames[i]] for i in range(len(varnames))]]
 
@@ -318,7 +294,9 @@ def dobayes_dsge(usesimdata = False):
 
     # get log-likelihood function
     # input parameters into this function and return log-likelihood (without priors)
-    loglikelihoodfunc = functools.partial(importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsge_bayes_func.py'), 'getbayes_dsge_logl_aux'), inputdict, getreplacedict_bayesian, data, varnames)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsge_bayes_func import getbayes_dsge_logl_aux
+    loglikelihoodfunc = functools.partial(getbayes_dsge_logl_aux, inputdict, getreplacedict_bayesian, data, varnames)
 
     # }}}
 
@@ -326,11 +304,17 @@ def dobayes_dsge(usesimdata = False):
     # I impose a relatively strict prior on BETA (the second element) since otherwise Metropolis-Hastings picks a very high BETA
     priorlist_meansd = [['beta', 0.9, 0.05], ['normal', 0.95, 0.005], ['normal', 0.3, 0.05]]
     # get a priorlist based upon parameters rather than means and standard deviations
-    priorlist_parameters = importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'getpriorlist_convert')(priorlist_meansd)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import getpriorlist_convert
+    priorlist_parameters = getpriorlist_convert(priorlist_meansd)
     # get details on priors
-    prior_means, prior_sds, prior_lbs, prior_ubs = importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'getpriorlistdetails_parameters')(priorlist_parameters)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import getpriorlistdetails_parameters
+    prior_means, prior_sds, prior_lbs, prior_ubs = getpriorlistdetails_parameters(priorlist_parameters)
     # get a density function for the priors - this is NOT log
-    priorfunc = functools.partial(importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'getpriordensityfunc_aux'), priorlist_parameters)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import getpriordensityfunc_aux
+    priorfunc = functools.partial(getpriordensityfunc_aux, priorlist_parameters)
     # get scalelist based upon sds
     scalelist = [0.5 * sd for sd in prior_sds]
 
@@ -343,7 +327,9 @@ def dobayes_dsge(usesimdata = False):
     # }}}
 
     # implement metropolis-hastings:{{{
-    results = importattr(__projectdir__ / Path('submodules/python-math-func/bayesian_func.py'), 'metropolis_hastings')(posteriorfunc, scalelist, prior_means, 1000, lowerboundlist = prior_lbs, upperboundlist = prior_ubs, printdetails = True, logposterior = True, raiseerror = False)
+    sys.path.append(str(__projectdir__ / Path('submodules/python-math-func/')))
+    from bayesian_func import metropolis_hastings
+    results = metropolis_hastings(posteriorfunc, scalelist, prior_means, 1000, lowerboundlist = prior_lbs, upperboundlist = prior_ubs, printdetails = True, logposterior = True, raiseerror = False)
     print(np.mean(np.array(results)[100: , :], axis = 0))
     # }}}
 

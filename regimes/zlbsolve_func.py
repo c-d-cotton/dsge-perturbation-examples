@@ -2,57 +2,11 @@
 """
 Simple examples of different methods of how to solve DSGE models with an occasionally binding constraint (the constraint here is the ZLB).
 """
-# PYTHON_PREAMBLE_START_STANDARD:{{{
-
-# Christopher David Cotton (c)
-# http://www.cdcotton.com
-
-# modules needed for preamble
-import importlib
 import os
 from pathlib import Path
 import sys
 
-# Get full real filename
-__fullrealfile__ = os.path.abspath(__file__)
-
-# Function to get git directory containing this file
-def getprojectdir(filename):
-    curlevel = filename
-    while curlevel is not '/':
-        curlevel = os.path.dirname(curlevel)
-        if os.path.exists(curlevel + '/.git/'):
-            return(curlevel + '/')
-    return(None)
-
-# Directory of project
-__projectdir__ = Path(getprojectdir(__fullrealfile__))
-
-# Function to call functions from files by their absolute path.
-# Imports modules if they've not already been imported
-# First argument is filename, second is function name, third is dictionary containing loaded modules.
-modulesdict = {}
-def importattr(modulefilename, func, modulesdict = modulesdict):
-    # get modulefilename as string to prevent problems in <= python3.5 with pathlib -> os
-    modulefilename = str(modulefilename)
-    # if function in this file
-    if modulefilename == __fullrealfile__:
-        return(eval(func))
-    else:
-        # add file to moduledict if not there already
-        if modulefilename not in modulesdict:
-            # check filename exists
-            if not os.path.isfile(modulefilename):
-                raise Exception('Module not exists: ' + modulefilename + '. Function: ' + func + '. Filename called from: ' + __fullrealfile__ + '.')
-            # add directory to path
-            sys.path.append(os.path.dirname(modulefilename))
-            # actually add module to moduledict
-            modulesdict[modulefilename] = importlib.import_module(''.join(os.path.basename(modulefilename).split('.')[: -1]))
-
-        # get the actual function from the file and return it
-        return(getattr(modulesdict[modulefilename], func))
-
-# PYTHON_PREAMBLE_END:}}}
+__projectdir__ = Path(os.path.dirname(os.path.realpath(__file__)) + '/../')
 
 import copy
 import numpy as np
@@ -127,7 +81,9 @@ def test_dsgenormal():
     """
     inputdict = getinputdict()
 
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsge_bkdiscrete_func.py'), 'discretelineardsgefull')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsge_bkdiscrete_func import discretelineardsgefull
+    discretelineardsgefull(inputdict)
 
 
 # Regime without Shock:{{{1
@@ -149,7 +105,9 @@ def tryregimenoshock_regime(p = None):
     inputdict_zlb = getinputdict(p_zlb, mainvars = mainvars)
 
     # try out regimes
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/regime_func.py'), 'regimechange')([inputdict_nozlb, inputdict_zlb], [1] * 10 + [0] * 10, irf = True)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from regime_func import regimechange
+    regimechange([inputdict_nozlb, inputdict_zlb], [1] * 10 + [0] * 10, irf = True)
 
 
 # Try Regime Change and a Shock:{{{1
@@ -171,7 +129,9 @@ def tryregimeshock(p = None):
 
     # try out regimes
     epsilon0 = np.array([[-0.2]])
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/regime_func.py'), 'regimechange')([inputdict_nozlb, inputdict_zlb], [1,1,1,1,0,0,0,0], irf = True, epsilon0 = epsilon0)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from regime_func import regimechange
+    regimechange([inputdict_nozlb, inputdict_zlb], [1,1,1,1,0,0,0,0], irf = True, epsilon0 = epsilon0)
 
 
 # Dynare Perfect Foresight:{{{1
@@ -190,21 +150,29 @@ def dynare_simul(p = None, run = False):
     inputdict['savefolder'] = os.path.join(__projectdir__, 'regimes/temp/perfect_foresight/')
 
     # add model
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgesetup_func.py'), 'getmodel_inputdict')(inputdict) 
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgesetup_func import getmodel_inputdict
+    inputdict = getmodel_inputdict(inputdict) 
 
     # add shock path
     inputdict['shockpath'] = shockpath_default
 
     # generate python2dynare
     inputdict['python2dynare_simulation'] = 'simul(periods = 20);'
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/python2dynare_func.py'), 'python2dynare_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from python2dynare_func import python2dynare_inputdict
+    python2dynare_inputdict(inputdict)
 
     # run dynare
     if run is True:
         # run dynare
-        importattr(__projectdir__ / Path('submodules/dsge-perturbation/python2dynare_func.py'), 'rundynare_inputdict')(inputdict)
+        sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+        from python2dynare_func import rundynare_inputdict
+        rundynare_inputdict(inputdict)
         # get irfs
-        importattr(__projectdir__ / Path('submodules/dsge-perturbation/python2dynare_func.py'), 'getirfs_dynare_inputdict')(inputdict)
+        sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+        from python2dynare_func import getirfs_dynare_inputdict
+        getirfs_dynare_inputdict(inputdict)
 
 
 def dynare_extendedpath(p = None, run = False):
@@ -224,21 +192,29 @@ def dynare_extendedpath(p = None, run = False):
     inputdict['savefolder'] = os.path.join(__projectdir__, 'regimes/temp/extendedpath/')
 
     # add model
-    inputdict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/dsgesetup_func.py'), 'getmodel_inputdict')(inputdict) 
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from dsgesetup_func import getmodel_inputdict
+    inputdict = getmodel_inputdict(inputdict) 
 
     # add shock path
     inputdict['shocksddict'] = copy.deepcopy(shocksddict_default)
 
     # generate python2dynare
     inputdict['python2dynare_simulation'] = 'extended_path(periods = 20,solver_periods=100);'
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/python2dynare_func.py'), 'python2dynare_inputdict')(inputdict)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from python2dynare_func import python2dynare_inputdict
+    python2dynare_inputdict(inputdict)
 
     # run dynare
     if run is True:
         # run dynare
-        importattr(__projectdir__ / Path('submodules/dsge-perturbation/python2dynare_func.py'), 'rundynare_inputdict')(inputdict)
+        sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+        from python2dynare_func import rundynare_inputdict
+        rundynare_inputdict(inputdict)
         # get irfs
-        importattr(__projectdir__ / Path('submodules/dsge-perturbation/python2dynare_func.py'), 'getirfs_dynare_inputdict')(inputdict)
+        sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+        from python2dynare_func import getirfs_dynare_inputdict
+        getirfs_dynare_inputdict(inputdict)
 
 # dynare_extendedpath(run = True)
 # Occbin:{{{1
@@ -261,7 +237,9 @@ def occbin_test(p = None):
     shocks = shockpath_default
 
     # simperiods determines how many periods simulate forward and also length of IRF
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/calloccbin_func.py'), 'calloccbin_oneconstraint')(inputdict_nozlb, inputdict_zlb, 'Ihat < -log(I_ss)', 'Ihat > -log(I_ss)', shocks, os.path.join(__projectdir__, 'regimes/temp/occbin/'), run = True, irf = True, simperiods = simperiods_default)
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from calloccbin_func import calloccbin_oneconstraint
+    calloccbin_oneconstraint(inputdict_nozlb, inputdict_zlb, 'Ihat < -log(I_ss)', 'Ihat > -log(I_ss)', shocks, os.path.join(__projectdir__, 'regimes/temp/occbin/'), run = True, irf = True, simperiods = simperiods_default)
 
 # Occbin-Like Functions:{{{1
 def myoccbin_test(p = None, simshock = False):
@@ -282,10 +260,16 @@ def myoccbin_test(p = None, simshock = False):
     inputdict_zlb = getinputdict(p_zlb, simshock = simshock)
 
     if simshock is True:
-        shocksddict = importattr(__projectdir__ / Path('submodules/dsge-perturbation/getshocks_func.py'), 'getshocksddict')(shocks_default, shocksddict = copy.deepcopy(shocksddict_default))
-        shockpath = importattr(__projectdir__ / Path('submodules/dsge-perturbation/getshocks_func.py'), 'getshockpath')(simperiods_default, shocks_default, shocksddict)
+        sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+        from getshocks_func import getshocksddict
+        shocksddict = getshocksddict(shocks_default, shocksddict = copy.deepcopy(shocksddict_default))
+        sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+        from getshocks_func import getshockpath
+        shockpath = getshockpath(simperiods_default, shocks_default, shocksddict)
     else:
         shockpath = shockpath_default
 
-    importattr(__projectdir__ / Path('submodules/dsge-perturbation/myoccbin_func.py'), 'myoccbin')(inputdict_nozlb, inputdict_zlb, 'Ihat > -log(I_ss)', shockpath, savefolder = os.path.join(__projectdir__, 'regimes/temp/occbin2/'), printdetails = True, printvars = ['Ihat'], irf = True, printprobbind = True, regimeupdatefunc = 'occbin')
+    sys.path.append(str(__projectdir__ / Path('submodules/dsge-perturbation/')))
+    from myoccbin_func import myoccbin
+    myoccbin(inputdict_nozlb, inputdict_zlb, 'Ihat > -log(I_ss)', shockpath, savefolder = os.path.join(__projectdir__, 'regimes/temp/occbin2/'), printdetails = True, printvars = ['Ihat'], irf = True, printprobbind = True, regimeupdatefunc = 'occbin')
 myoccbin_test()
